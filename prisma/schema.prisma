@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client-js"
   output   = "../app/generated/prisma"
@@ -10,4 +5,116 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+// ─── ENUMS ───────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  VOLUNTEER
+}
+
+enum EventStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+enum AssignmentStatus {
+  ASSIGNED
+  CONFIRMED
+  WITHDRAWN
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+}
+
+// ─── MODELS ──────────────────────────────────────────────
+
+model User {
+  id               String            @id @default(uuid())
+  email            String            @unique
+  passwordHash     String
+  role             Role              @default(VOLUNTEER)
+  createdAt        DateTime          @default(now())
+  volunteerProfile VolunteerProfile?
+}
+
+model Area {
+  id                String             @id @default(uuid())
+  name              String             @unique
+  volunteerProfiles VolunteerProfile[]
+}
+
+model VolunteerProfile {
+  id               String             @id @default(uuid())
+  userId           String             @unique
+  name             String
+  phone            String
+  totalHours       Int                @default(0)
+  isActive         Boolean            @default(true)
+  createdAt        DateTime           @default(now())
+  areaId           String
+  user             User               @relation(fields: [userId], references: [id])
+  area             Area               @relation(fields: [areaId], references: [id])
+  volunteerSkills  VolunteerSkill[]
+  eventAssignments EventAssignment[]
+  attendance       Attendance[]
+}
+
+model Skill {
+  id              String           @id @default(uuid())
+  name            String           @unique
+  volunteerSkills VolunteerSkill[]
+}
+
+model VolunteerSkill {
+  id                 String           @id @default(uuid())
+  volunteerProfileId String
+  skillId            String
+  volunteerProfile   VolunteerProfile @relation(fields: [volunteerProfileId], references: [id])
+  skill              Skill            @relation(fields: [skillId], references: [id])
+
+  @@unique([volunteerProfileId, skillId])
+}
+
+model Event {
+  id               String            @id @default(uuid())
+  title            String
+  description      String
+  location         String
+  date             DateTime
+  status           EventStatus       @default(UPCOMING)
+  createdAt        DateTime          @default(now())
+  eventAssignments EventAssignment[]
+  attendance       Attendance[]
+}
+
+model EventAssignment {
+  id                 String           @id @default(uuid())
+  volunteerProfileId String
+  eventId            String
+  status             AssignmentStatus @default(ASSIGNED)
+  assignedAt         DateTime         @default(now())
+  volunteerProfile   VolunteerProfile @relation(fields: [volunteerProfileId], references: [id])
+  event              Event            @relation(fields: [eventId], references: [id])
+
+  @@unique([volunteerProfileId, eventId])
+}
+
+model Attendance {
+  id                 String           @id @default(uuid())
+  volunteerProfileId String
+  eventId            String
+  status             AttendanceStatus @default(ABSENT)
+  hoursLogged        Int              @default(0)
+  markedAt           DateTime         @default(now())
+  volunteerProfile   VolunteerProfile @relation(fields: [volunteerProfileId], references: [id])
+  event              Event            @relation(fields: [eventId], references: [id])
+
+  @@unique([volunteerProfileId, eventId])
 }
