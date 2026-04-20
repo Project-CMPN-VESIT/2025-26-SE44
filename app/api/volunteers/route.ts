@@ -13,9 +13,13 @@ export async function GET() {
       include: {
         user: { select: { email: true, role: true } },
         area: true,
-        volunteerSkills: { include: { skill: true } }
+        volunteerSkills: { include: { skill: true } },
+        eventAssignments: {
+          where: { status: 'CONFIRMED' },
+          select: { id: true }
+        }
       },
-      orderBy: { totalHours: 'desc' }
+      orderBy: { name: 'asc' }
     })
 
     return NextResponse.json(volunteers)

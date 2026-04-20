@@ -1,17 +1,20 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { ICONS, avatarColors } from '@/lib/constants'
+import Sidebar from '@/components/Sidebar'
+import Topbar from '@/components/Topbar'
+import { ICONS } from '@/lib/constants'
 
 type VolunteerProfile = {
   id: string
   name: string
+  phone: string
   totalHours: number
+  isActive: boolean
+  createdAt: string
   area: { name: string }
-  volunteerSkills: { skill: { name: string } }[]
 }
 
-type EventAssignment = {
+type Assignment = {
   id: string
   status: string
   event: {
@@ -20,459 +23,180 @@ type EventAssignment = {
     date: string
     location: string
     status: string
-  }
-}
-
-type AttendanceRecord = {
-  id: string
-  status: string
-  hoursLogged: number
-  markedAt: string
-  event: {
-    title: string
-    date: string
+    category?: string
   }
 }
 
 export default function VolunteerDashboard() {
-  const router = useRouter()
-  const [tab, setTab] = useState('overview')
   const [profile, setProfile] = useState<VolunteerProfile | null>(null)
-  const [events, setEvents] = useState<EventAssignment[]>([])
-  const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
+  const [assignments, setAssignments] = useState<Assignment[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadData()
-  }, [])
+  useEffect(() => { loadData() }, [])
 
   async function loadData() {
     setLoading(true)
     try {
-      const [profileRes, eventsRes, attendanceRes] = await Promise.all([
-        fetch('/api/volunteers/me'),
-        fetch('/api/events'),
-        fetch('/api/attendance')
-      ])
+      const profRes = await fetch('/api/volunteers/me')
+      if (profRes.ok) setProfile(await profRes.json())
 
-      if (profileRes.ok) setProfile(await profileRes.json())
-      if (eventsRes.ok) setEvents(await eventsRes.json())
-      if (attendanceRes.ok) setAttendance(await attendanceRes.json())
-    } catch (error) {
-      console.error(error)
-    }
+      const eventsRes = await fetch('/api/events')
+      if (eventsRes.ok) setAssignments(await eventsRes.json())
+    } catch (e) { console.error(e) }
     setLoading(false)
   }
 
-  async function handleLogout() {
-    await fetch('/api/auth/logout', { method: 'POST' })
-    router.push('/login')
+  async function toggleStatus() {
+    if (!profile) return
+    const newStatus = !profile.isActive
+    try {
+      const res = await fetch('/api/volunteers/me', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: newStatus })
+      })
+      if (res.ok) {
+        setProfile(prev => prev ? { ...prev, isActive: newStatus } : prev)
+      }
+    } catch (e) { console.error(e) }
   }
 
-  const presentCount = attendance.filter(a => a?.status === 'PRESENT').length
-  const absentCount = attendance.filter(a => a?.status === 'ABSENT').length
-  const upcomingEvents = events.filter(e => e?.event?.status === 'UPCOMING')
+  const name = profile?.name || "Volunteer"
+  const initials = name.split(" ").map(n => n[0]).join("").slice(0, 2)
+  const areaName = profile?.area?.name || "Bharat"
+  const statusLabel = profile?.isActive ? "Available" : "Busy"
 
-  const initials = profile?.name
-    .split(' ')
-    .map(n => n[0])
-    .join('')
-    .slice(0, 2) || 'V'
-
-  if (loading) {
-    return (
-      <div style={{
-        minHeight: '100vh', display: 'flex',
-        alignItems: 'center', justifyContent: 'center',
-        background: 'var(--bg)'
-      }}>
-        <div style={{ fontFamily: "'Fraunces',serif", fontSize: '1.2rem', color: 'var(--text-muted)' }}>
-          Loading...
-        </div>
-      </div>
-    )
-  }
+  if (loading) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+      <div style={{ fontFamily: "'Fraunces',serif", fontSize: '1.2rem', color: 'var(--text-muted)' }}>Loading Dashboard...</div>
+    </div>
+  )
 
   return (
-    <div style={{ display: 'flex' }}>
-
-      {/* Sidebar */}
-      <aside className="sidebar">
-        <div className="sidebar-brand">
-          <div className="brand-icon" style={{
-            background: 'linear-gradient(135deg,var(--primary),var(--accent))'
-          }}>
-            <svg viewBox="0 0 24 24" style={{ width: 20, height: 20, fill: '#fff' }}>
-              <path d={ICONS.heart} />
-            </svg>
-          </div>
-          <div>
-            <div className="brand-name">SevaConnect</div>
-            <span className="brand-role" style={{ color: 'var(--primary)' }}>Volunteer Portal</span>
-          </div>
-        </div>
-
-        <nav className="sidebar-nav">
-          <span className="nav-section">My Dashboard</span>
-          <button
-            className={`nav-item ${tab === 'overview' ? 'active' : ''}`}
-            onClick={() => setTab('overview')}
-          >
-            <svg viewBox="0 0 24 24" style={{ width: 18, height: 18, fill: 'currentColor' }}>
-              <path d={ICONS.home} />
-            </svg>
-            Overview
-          </button>
-
-          <span className="nav-section">Participate</span>
-          <button
-            className={`nav-item ${tab === 'events' ? 'active' : ''}`}
-            onClick={() => setTab('events')}
-          >
-            <svg viewBox="0 0 24 24" style={{ width: 18, height: 18, fill: 'currentColor' }}>
-              <path d={ICONS.calendar} />
-            </svg>
-            My Events
-          </button>
-
-          <span className="nav-section">Records</span>
-          <button
-            className={`nav-item ${tab === 'participation' ? 'active' : ''}`}
-            onClick={() => setTab('participation')}
-          >
-            <svg viewBox="0 0 24 24" style={{ width: 18, height: 18, fill: 'currentColor' }}>
-              <path d={ICONS.reports} />
-            </svg>
-            Participation History
-          </button>
-          <button
-            className={`nav-item ${tab === 'attendance' ? 'active' : ''}`}
-            onClick={() => setTab('attendance')}
-          >
-            <svg viewBox="0 0 24 24" style={{ width: 18, height: 18, fill: 'currentColor' }}>
-              <path d={ICONS.attendance} />
-            </svg>
-            Attendance
-          </button>
-        </nav>
-
-        <div className="sidebar-footer">
-          <div className="user-card">
-            <div className="user-avatar-sm" style={{
-              background: 'linear-gradient(135deg,var(--primary),var(--accent))'
-            }}>
-              {initials}
-            </div>
-            <div>
-              <div className="user-name">{profile?.name || 'Volunteer'}</div>
-              <div className="user-role-text" style={{ color: 'var(--primary)' }}>Volunteer</div>
-            </div>
-            <button className="logout-btn" onClick={handleLogout}>
-              <svg viewBox="0 0 24 24"><path d={ICONS.logout} /></svg>
-            </button>
-          </div>
-        </div>
-      </aside>
-
-      {/* Main Content */}
+    <div style={{ display: "flex" }}>
+      <Sidebar 
+        role="VOLUNTEER" 
+        userName={name} 
+        userRoleLabel="Volunteer" 
+        avatarLetter={initials} 
+        accentColor="var(--primary)" 
+      />
+      
       <div className="main-wrap">
-        <div className="topbar">
-          <span className="topbar-title">
-            {tab === 'overview' && 'Dashboard'}
-            {tab === 'events' && 'My Events'}
-            {tab === 'participation' && 'Participation History'}
-            {tab === 'attendance' && 'My Attendance'}
-          </span>
-        </div>
-
+        <Topbar title="My Dashboard" />
+        
         <div className="content">
-
-          {/* ── Overview Tab ── */}
-          {tab === 'overview' && (
-            <div style={{ animation: 'fadeIn .35s ease' }}>
-              <div className="stats-grid">
-                <div className="stat-card" style={{
-                  background: 'linear-gradient(135deg,var(--primary),var(--primary-h))',
-                  color: '#fff', border: 'none'
-                }}>
-                  <div className="stat-number">{profile?.totalHours || 0}</div>
-                  <div className="stat-label" style={{ color: 'rgba(255,255,255,.8)' }}>Total Hours</div>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-number">{upcomingEvents.length}</div>
-                  <div className="stat-label">Upcoming Events</div>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-number">{presentCount}</div>
-                  <div className="stat-label">Events Attended</div>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-number">
-                    {attendance.length > 0
-                      ? Math.round((presentCount / attendance.length) * 100)
-                      : 0}%
-                  </div>
-                  <div className="stat-label">Attendance Rate</div>
-                </div>
-              </div>
-
-              {/* Profile Card */}
-              <div className="panel">
-                <div className="panel-header">
-                  <span className="panel-title">My Profile</span>
-                </div>
-                <div className="panel-body">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-                    <div style={{
-                      width: 64, height: 64, borderRadius: '50%',
-                      background: 'linear-gradient(135deg,var(--primary),var(--accent))',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontWeight: 700, color: '#fff', fontSize: '1.4rem', flexShrink: 0
-                    }}>
-                      {initials}
+          {/* Header Banner */}
+          <div style={{ 
+            background: "linear-gradient(135deg,var(--primary) 0%,#B04420 50%,var(--accent) 100%)", 
+            borderRadius: "var(--radius)", 
+            padding: "28px 32px", 
+            marginBottom: 28, 
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "space-between", 
+            position: "relative", 
+            overflow: "hidden",
+            boxShadow: "0 8px 30px rgba(200,82,42,0.15)"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
+              <div style={{ 
+                width: 72, height: 72, borderRadius: "50%", 
+                background: "rgba(255,255,255,.25)", 
+                display: "flex", alignItems: "center", justifyContent: "center", 
+                fontFamily: "'Fraunces',serif", fontSize: "1.8rem", 
+                fontWeight: 700, color: "#fff", flexShrink: 0, 
+                border: "3px solid rgba(255,255,255,.4)" 
+              }}>{initials}</div>
+              <div>
+                <div style={{ fontFamily: "'Fraunces',serif", fontSize: "1.4rem", fontWeight: 700, color: "#fff", marginBottom: 3 }}>{name}</div>
+                <div style={{ fontSize: ".85rem", color: "rgba(255,255,255,.75)", marginBottom: 12 }}>📍 {areaName}</div>
+                <div style={{ display: "flex", gap: 24 }}>
+                  {[
+                    [profile?.totalHours || 0, "HOURS"], 
+                    [assignments.length, "EVENTS"]
+                  ].map(([n, l]) => (
+                    <div key={l as string} style={{ textAlign: "center" }}>
+                      <div style={{ fontFamily: "'Fraunces',serif", fontSize: "1.3rem", fontWeight: 700, color: "#fff" }}>{n}</div>
+                      <div style={{ fontSize: ".7rem", color: "rgba(255,255,255,.65)", fontWeight: 600 }}>{l}</div>
                     </div>
-                    <div>
-                      <div style={{ fontFamily: "'Fraunces',serif", fontSize: '1.2rem', fontWeight: 700 }}>
-                        {profile?.name}
-                      </div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '.85rem', fontWeight: 600, marginTop: 4 }}>
-                        📍 {profile?.area?.name}
-                      </div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-                        {profile?.volunteerSkills?.map(vs => (
-                          <span key={vs.skill.name} className="badge badge-green">
-                            {vs.skill.name}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                  ))}
                 </div>
-              </div>
-
-              {/* Upcoming Events Preview */}
-              {upcomingEvents.length > 0 && (
-                <div className="panel">
-                  <div className="panel-header">
-                    <span className="panel-title">Upcoming Events</span>
-                    <button className="btn btn-ghost" onClick={() => setTab('events')}>
-                      View All
-                    </button>
-                  </div>
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Event</th>
-                        <th>Date</th>
-                        <th>Location</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {upcomingEvents.slice(0, 3).map(a => (
-                        <tr key={a.id}>
-                          <td style={{ fontWeight: 700 }}>{a.event.title}</td>
-                          <td style={{ color: 'var(--text-muted)' }}>
-                            {new Date(a.event.date).toLocaleDateString()}
-                          </td>
-                          <td style={{ color: 'var(--text-muted)' }}>{a.event.location}</td>
-                          <td>
-                            <span className="badge badge-amber">{a.status}</span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── My Events Tab ── */}
-          {tab === 'events' && (
-            <div style={{ animation: 'fadeIn .35s ease' }}>
-              <div className="panel">
-                <div className="panel-header">
-                  <span className="panel-title">My Assigned Events</span>
-                </div>
-                {events.length === 0 ? (
-                  <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-muted)' }}>
-                    <div style={{ fontSize: '2rem', marginBottom: 12 }}>📅</div>
-                    <div>You have no assigned events yet.</div>
-                  </div>
-                ) : (
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Event</th>
-                        <th>Date</th>
-                        <th>Location</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {events.map(a => (
-                        <tr key={a.id}>
-                          <td style={{ fontWeight: 700 }}>{a.event.title}</td>
-                          <td style={{ color: 'var(--text-muted)' }}>
-                            {new Date(a.event.date).toLocaleDateString()}
-                          </td>
-                          <td style={{ color: 'var(--text-muted)' }}>{a.event.location}</td>
-                          <td>
-                            <span className={`badge ${
-                              a.event.status === 'UPCOMING' ? 'badge-amber' :
-                              a.event.status === 'COMPLETED' ? 'badge-green' : 'badge-red'
-                            }`}>
-                              {a.event.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
               </div>
             </div>
-          )}
-
-          {/* ── Participation History Tab ── */}
-          {tab === 'participation' && (
-            <div style={{ animation: 'fadeIn .35s ease' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20 }}>
-                <div className="panel">
-                  <div className="panel-header">
-                    <span className="panel-title">Previous Events</span>
-                  </div>
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Event</th>
-                        <th>Date</th>
-                        <th style={{ textAlign: 'right' }}>Hours</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {attendance.length === 0 ? (
-                        <tr>
-                          <td colSpan={3} style={{ textAlign: 'center', padding: 30, color: 'var(--text-muted)' }}>
-                            No history found.
-                          </td>
-                        </tr>
-                      ) : attendance.map((a, i) => (
-                        <tr key={i}>
-                          <td style={{ fontWeight: 700 }}>{a.event.title}</td>
-                          <td style={{ color: 'var(--text-muted)' }}>
-                            {new Date(a.event.date).toLocaleDateString()}
-                          </td>
-                          <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--primary)' }}>
-                            {a.hoursLogged}h
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+            
+            {/* Status Toggle - syncs with DB */}
+            <div style={{ 
+              background: "rgba(255,255,255,0.15)", 
+              padding: "12px 18px", 
+              borderRadius: 16, 
+              backdropFilter: "blur(10px)", 
+              border: "1px solid rgba(255,255,255,0.2)", 
+              display: "flex", flexDirection: "column", 
+              alignItems: "center", gap: 8 
+            }}>
+              <div style={{ fontSize: "0.7rem", fontWeight: 800, color: "rgba(255,255,255,0.9)", letterSpacing: 0.5 }}>STATUS</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: statusLabel === "Available" ? "#9ef01a" : "rgba(255,255,255,0.5)" }}>Available</span>
+                <div 
+                  onClick={toggleStatus}
+                  style={{ width: 44, height: 22, background: statusLabel === "Available" ? "#38b000" : "#d00000", borderRadius: 20, position: "relative", cursor: "pointer", transition: "all 0.3s ease" }}
+                >
+                  <div style={{ 
+                    width: 18, height: 18, background: "#fff", 
+                    borderRadius: "50%", position: "absolute", top: 2, 
+                    left: statusLabel === "Available" ? 24 : 2, 
+                    transition: "all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55)" 
+                  }}></div>
                 </div>
+                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: statusLabel === "Busy" ? "#ff4d4d" : "rgba(255,255,255,0.5)" }}>Busy</span>
+              </div>
+            </div>
+          </div>
 
-                <div className="panel">
-                  <div className="panel-header">
-                    <span className="panel-title">Impact Summary</span>
-                  </div>
-                  <div className="panel-body">
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{
-                        fontFamily: "'Fraunces',serif",
-                        fontSize: '3rem', fontWeight: 700,
-                        color: 'var(--primary)', lineHeight: 1
-                      }}>
-                        {profile?.totalHours || 0}
-                      </div>
-                      <div style={{
-                        fontSize: '.85rem', fontWeight: 700,
-                        color: 'var(--text-muted)', marginTop: 8
-                      }}>
-                        Total Hours Contributed
-                      </div>
-                      <div style={{
-                        marginTop: 20, padding: 16,
-                        background: 'var(--secondary-pale)',
-                        borderRadius: 12
-                      }}>
-                        <div style={{ fontSize: '.85rem', fontWeight: 700, color: 'var(--admin)' }}>
-                          🌱 {attendance.length} events participated
-                        </div>
+          {/* Key Metrics - Updated: hours completed, events attended, area */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16, marginBottom: 24 }}>
+            {[
+              ["⏱️", "var(--accent-pale)", `${profile?.totalHours || 0}h`, "Hours Completed"], 
+              ["📅", "var(--secondary-pale)", `${assignments.filter(a => a.status === 'CONFIRMED').length}`, "Events Confirmed"], 
+              ["📍", "var(--primary-pale)", areaName, "My Area"]
+            ].map(([ic, bg, n, l]) => (
+              <div key={l} className="stat-card" style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{ width: 42, height: 42, borderRadius: 10, background: bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem" }}>{ic}</div>
+                <div>
+                  <div style={{ fontFamily: "'Fraunces',serif", fontSize: "1.4rem", fontWeight: 700 }}>{n}</div>
+                  <div style={{ fontSize: ".78rem", color: "var(--text-muted)", fontWeight: 600 }}>{l}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 20 }}>
+            <div className="panel">
+              <div className="panel-header">
+                <span className="panel-title">My Registered Events</span>
+                <span className="badge badge-amber">{assignments.length} assigned</span>
+              </div>
+              <div className="panel-body" style={{ padding: "10px 22px" }}>
+                {assignments.length === 0 ? (
+                  <div style={{ padding: 40, textAlign: "center", color: "var(--text-muted)" }}>You haven't been assigned to any events yet.</div>
+                ) : assignments.map((a, i) => (
+                  <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "16px 0", borderBottom: i < assignments.length - 1 ? "1px solid var(--border)" : "none" }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 10, background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem" }}>🌿</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: ".88rem", fontWeight: 700 }}>{a.event.title}</div>
+                      <div style={{ fontSize: ".76rem", color: "var(--text-muted)", marginTop: 2 }}>
+                        {new Date(a.event.date).toLocaleDateString()} · {a.event.location}
                       </div>
                     </div>
+                    <span className={`badge ${a.status === 'CONFIRMED' ? 'badge-green' : a.status === 'ASSIGNED' ? 'badge-amber' : 'badge-gray'}`}>
+                      {a.status === 'CONFIRMED' ? 'Accepted' : a.status === 'ASSIGNED' ? 'Pending' : 'Declined'}
+                    </span>
                   </div>
-                </div>
+                ))}
               </div>
             </div>
-          )}
-
-          {/* ── Attendance Tab ── */}
-          {tab === 'attendance' && (
-            <div style={{ animation: 'fadeIn .35s ease' }}>
-              <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
-                <div className="stat-card">
-                  <div className="stat-number">{attendance.length}</div>
-                  <div className="stat-label">Total Events</div>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-number" style={{ color: 'var(--secondary)' }}>
-                    {presentCount}
-                  </div>
-                  <div className="stat-label">Present</div>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-number" style={{ color: '#c0392b' }}>
-                    {absentCount}
-                  </div>
-                  <div className="stat-label">Absent</div>
-                </div>
-              </div>
-
-              <div className="panel">
-                <div className="panel-header">
-                  <span className="panel-title">Attendance Record</span>
-                </div>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Event</th>
-                      <th>Date</th>
-                      <th>Hours</th>
-                      <th style={{ textAlign: 'right' }}>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {attendance.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} style={{ textAlign: 'center', padding: 30, color: 'var(--text-muted)' }}>
-                          No attendance records found.
-                        </td>
-                      </tr>
-                    ) : attendance.map((a, i) => (
-                      <tr key={i}>
-                        <td style={{ fontWeight: 700 }}>{a.event.title}</td>
-                        <td style={{ color: 'var(--text-muted)' }}>
-                          {new Date(a.event.date).toLocaleDateString()}
-                        </td>
-                        <td style={{ fontWeight: 700 }}>{a.hoursLogged}h</td>
-                        <td style={{ textAlign: 'right' }}>
-                          <span className={`badge ${
-                            a.status === 'PRESENT' ? 'badge-green' :
-                            a.status === 'ABSENT' ? 'badge-red' : 'badge-amber'
-                          }`}>
-                            {a.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
+          </div>
         </div>
       </div>
     </div>

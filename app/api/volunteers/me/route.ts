@@ -24,3 +24,21 @@ export async function GET() {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }
+
+export async function PUT(request: Request) {
+  try {
+    const session = await getSession()
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    const body = await request.json()
+    const profile = await prisma.volunteerProfile.update({
+      where: { userId: session.id },
+      data: { isActive: body.isActive }
+    })
+    return NextResponse.json(profile)
+  } catch (error) {
+    console.error('Profile update error:', error)
+    return NextResponse.json({ error: String(error) }, { status: 500 })
+  }
+}

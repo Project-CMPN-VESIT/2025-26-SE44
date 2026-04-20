@@ -31,6 +31,7 @@ enum AttendanceStatus {
   PRESENT
   ABSENT
   LATE
+  UNMARKED
 }
 
 // ─── MODELS ──────────────────────────────────────────────
@@ -57,6 +58,7 @@ model VolunteerProfile {
   phone            String
   totalHours       Int                @default(0)
   isActive         Boolean            @default(true)
+  approvalStatus   String             @default("APPROVED")
   createdAt        DateTime           @default(now())
   areaId           String
   user             User               @relation(fields: [userId], references: [id])
@@ -88,6 +90,9 @@ model Event {
   description      String
   location         String
   date             DateTime
+  category         String            @default("Community")
+  slots            Int               @default(20)
+  estimatedHours   Int               @default(4)
   status           EventStatus       @default(UPCOMING)
   createdAt        DateTime          @default(now())
   eventAssignments EventAssignment[]
@@ -110,7 +115,7 @@ model Attendance {
   id                 String           @id @default(uuid())
   volunteerProfileId String
   eventId            String
-  status             AttendanceStatus @default(ABSENT)
+  status             AttendanceStatus @default(UNMARKED)
   hoursLogged        Int              @default(0)
   markedAt           DateTime         @default(now())
   volunteerProfile   VolunteerProfile @relation(fields: [volunteerProfileId], references: [id])

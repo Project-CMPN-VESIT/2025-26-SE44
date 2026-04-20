@@ -6,10 +6,17 @@ export async function POST() {
     { status: 200 }
   )
 
+  // Delete the token cookie — set it expired with maxAge 0
   response.cookies.set('token', '', {
     httpOnly: true,
-    maxAge: 0
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 0,
+    path: '/'
   })
+
+  // Also explicitly delete via the cookies.delete API
+  response.cookies.delete('token')
 
   return response
 }
