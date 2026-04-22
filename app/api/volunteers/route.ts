@@ -28,3 +28,31 @@ export async function GET() {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }
+
+export async function PATCH(request: Request) {
+  try {
+    const session = await getSession()
+    if (!session || session.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { id, approvalStatus } = await request.json()
+
+    if (!id || !approvalStatus) {
+      return NextResponse.json({ error: 'Missing id or approvalStatus' }, { status: 400 })
+    }
+
+    const updated = await prisma.volunteerProfile.update({
+      where: { id },
+      data: { 
+        approvalStatus,
+        isActive: approvalStatus === 'APPROVED' ? true : false
+      }
+    })
+
+    return NextResponse.json(updated)
+  } catch (error) {
+    console.error('Volunteer update error:', error)
+    return NextResponse.json({ error: String(error) }, { status: 500 })
+  }
+}

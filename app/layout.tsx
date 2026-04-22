@@ -17,6 +17,8 @@ export const metadata: Metadata = {
   description: "A professional platform for NGOs to track volunteer history, celebrate impact, and manage community records.",
 };
 
+import { ModalProvider } from "@/components/ModalProvider";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -24,7 +26,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" style={{ width: '100%', minHeight: '100vh' }}>
-      <body style={{ width: '100%', minHeight: '100vh', margin: 0, padding: 0 }}>{children}</body>
+      <body style={{ width: '100%', minHeight: '100vh', margin: 0, padding: 0 }}>
+        <ModalProvider>
+          {children}
+        </ModalProvider>
+      </body>
     </html>
   );
 }

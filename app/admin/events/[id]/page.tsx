@@ -4,11 +4,13 @@ import { useRouter } from "next/navigation"
 import Sidebar from "@/components/Sidebar"
 import { ICONS, avatarColors } from "@/lib/constants"
 import { useParams } from "next/navigation"
+import { useModal } from "@/components/ModalProvider"
 
 export default function EventDetails() {
   const router = useRouter()
   const params = useParams()
   const eventId = params.id as string
+  const { showAlert, showConfirm } = useModal()
 
   const [showAddVolModal, setShowAddVolModal] = useState(false)
   const [event, setEvent] = useState<any>(null)
@@ -68,7 +70,7 @@ export default function EventDetails() {
   }
 
   async function assignVolunteer() {
-    if (!selectedInvitee) return alert("Select a volunteer first")
+    if (!selectedInvitee) return showAlert({ message: "Select a volunteer first", type: "warning" })
     try {
       const res = await fetch('/api/assignments', {
         method: 'POST',
@@ -76,21 +78,26 @@ export default function EventDetails() {
         body: JSON.stringify({ eventId, volunteerProfileId: selectedInvitee })
       })
       if (res.ok) {
-        alert("Invite sent to the volunteer!")
+        showAlert({ message: "Invite sent to the volunteer!", type: "success" })
         setShowAddVolModal(false)
         setSelectedInvitee("")
         loadData()
       } else {
         const data = await res.json()
-        alert("Error: " + (data.error || "Failed to assign"))
+        showAlert({ message: data.error || "Failed to assign volunteer", type: "danger", title: "Error" })
       }
     } catch (e: any) {
-      alert("Error: " + e.message)
+      showAlert({ message: e.message, type: "danger", title: "Error" })
     }
   }
 
   async function removeVolunteer(assignmentId: string) {
-    if (!confirm("Are you sure you want to remove this volunteer?")) return
+    const ok = await showConfirm({ 
+      message: "Are you sure you want to remove this volunteer from the event?", 
+      type: "danger",
+      confirmText: "Remove"
+    })
+    if (!ok) return
     try {
       // We'll withdraw the assignment
       const res = await fetch('/api/assignments', {
@@ -99,7 +106,7 @@ export default function EventDetails() {
         body: JSON.stringify({ assignmentId, action: 'REJECT' })
       })
       if (res.ok) {
-        alert("Volunteer removed.")
+        showAlert({ message: "Volunteer removed from event.", type: "success" })
         loadData()
       }
     } catch {}
@@ -115,29 +122,42 @@ export default function EventDetails() {
       })
       if (res.ok) {
         setShowEditModal(false)
-        alert("Event updated successfully!")
+        showAlert({ message: "Event updated successfully!", type: "success" })
         loadData()
       } else {
-        alert("Error updating event")
+        showAlert({ message: "Error updating event", type: "danger" })
       }
     } catch (err: any) {
-      alert("Error updating: " + err.message)
+      showAlert({ message: "Error updating: " + err.message, type: "danger" })
     }
   }
 
   async function deleteEvent() {
-    if (!confirm("Are you sure you want to permanently delete this event?")) return
+    const ok = await showConfirm({
+      message: "Are you sure you want to permanently delete this event? This action cannot be undone.",
+      type: "danger",
+      confirmText: "Delete Event"
+    })
+    if (!ok) return
     try {
       const res = await fetch(`/api/events/${eventId}`, { method: 'DELETE' })
-      if (res.ok) router.push('/admin/events')
-      else alert("Error deleting event.")
+      if (res.ok) {
+        router.push('/admin/events')
+      } else {
+        showAlert({ message: "Error deleting event.", type: "danger" })
+      }
     } catch (err: any) {
-      alert("Error deleting: " + err.message)
+      showAlert({ message: "Error deleting: " + err.message, type: "danger" })
     }
   }
 
   async function markCompleted() {
-    if (!confirm("Mark this event as COMPLETED?")) return
+    const ok = await showConfirm({
+      message: "Mark this event as COMPLETED? This will close volunteer assignments.",
+      type: "confirm",
+      confirmText: "Mark Completed"
+    })
+    if (!ok) return
     try {
       const res = await fetch(`/api/events/${eventId}`, {
         method: 'PUT',
@@ -145,13 +165,13 @@ export default function EventDetails() {
         body: JSON.stringify({ ...event, status: 'COMPLETED' })
       })
       if (res.ok) {
-        alert("Event marked as COMPLETED!")
+        showAlert({ message: "Event marked as COMPLETED!", type: "success" })
         loadData()
       } else {
-        alert("Error updating status")
+        showAlert({ message: "Error updating status", type: "danger" })
       }
     } catch (err: any) {
-      alert("Error: " + err.message)
+      showAlert({ message: "Error: " + err.message, type: "danger" })
     }
   }
 
@@ -255,7 +275,9 @@ export default function EventDetails() {
               <div className="panel">
                 <div className="panel-header">
                   <span className="panel-title">Assigned Volunteers ({volunteers.length})</span>
-                  <button onClick={() => setShowAddVolModal(true)} className="btn btn-primary" style={{ fontSize: ".8rem", padding: "7px 14px", background: "var(--admin)" }}>+ Add Volunteer</button>
+                  {event.status !== 'COMPLETED' && event.status !== 'CANCELLED' && (
+                    <button onClick={() => setShowAddVolModal(true)} className="btn btn-primary" style={{ fontSize: ".8rem", padding: "7px 14px", background: "var(--admin)" }}>+ Add Volunteer</button>
+                  )}
                 </div>
                 <table>
                   <thead><tr><th>Volunteer</th><th>Status</th><th></th></tr></thead>
@@ -325,9 +347,12 @@ export default function EventDetails() {
               <label>Select Volunteer</label>
               <select value={selectedInvitee} onChange={e => setSelectedInvitee(e.target.value)} style={{ padding: "12px 14px", width: "100%", border: "2px solid var(--border)", borderRadius: "12px", background: "var(--surface)", fontFamily: "'Nunito',sans-serif", fontSize: ".85rem" }}>
                 <option value="">Select a volunteer...</option>
-                {allVolunteers.map((v: any) => (
-                  <option key={v.id} value={v.id}>{v.name} — {v.area?.name}</option>
-                ))}
+                {allVolunteers
+                  .filter(v => !volunteers.some(av => av.id === v.id))
+                  .map((v: any) => (
+                    <option key={v.id} value={v.id}>{v.name} — {v.area?.name}</option>
+                  ))
+                }
               </select>
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 24 }}>

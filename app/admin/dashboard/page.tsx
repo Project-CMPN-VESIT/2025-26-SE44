@@ -90,12 +90,7 @@ export default function AdminDashboard() {
     setLoading(false)
   }
 
-  async function performCleanup() {
-     if (!confirm("This will delete all original placeholder mock data. Are you sure?")) return;
-     // The mock clean function would typically request a backend API to trigger deletions via Prisma map
-     alert("Mock data cleaned!");
-     loadDashboardData()
-  }
+
 
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
@@ -113,9 +108,7 @@ export default function AdminDashboard() {
             <div style={{ fontSize: ".78rem", color: "var(--text-muted)", marginLeft: 6 }}>
               {new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </div>
-            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-              <button className="btn btn-ghost" onClick={performCleanup} style={{ fontSize: ".75rem", color: "#c0392b" }}>🗑 Clean Mock Data</button>
-            </div>
+
           </div>
 
           <div style={{ background: "linear-gradient(135deg,var(--admin),#40916C)", borderRadius: "var(--radius)", padding: "28px 32px", marginBottom: 28, display: "flex", alignItems: "center", justifyContent: "space-between" }}>

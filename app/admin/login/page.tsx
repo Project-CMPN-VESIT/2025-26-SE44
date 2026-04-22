@@ -5,16 +5,16 @@ import { ICONS } from "@/lib/constants"
 
 export default function AdminLoginPage() {
   const router = useRouter()
-  const [email, setEmail] = useState("shreya@volunteerhub.org")
+  const [email, setEmail] = useState("admin@sevaconnect.com")
   const [password, setPassword] = useState("admin123")
   const [showPw, setShowPw] = useState(false)
-  const [error, setError] = useState(false)
+  const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
 
   async function doLogin() {
-    setError(false)
+    setError("")
     if (!email || !password) {
-      setError(true)
+      setError("Please enter both email and password")
       return
     }
     
@@ -29,21 +29,21 @@ export default function AdminLoginPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        setError(true)
+        setError(data.error || "Invalid credentials")
         setLoading(false)
         return
       }
 
       if (data.role !== 'ADMIN') {
-        setError(true)
+        setError("Access denied: You are not an admin")
         setLoading(false)
         await fetch('/api/auth/logout', { method: 'POST' })
         return
       }
 
       router.push('/admin/dashboard')
-    } catch {
-      setError(true)
+    } catch (err) {
+      setError("An unexpected error occurred. Please check if the server is running.")
       setLoading(false)
     }
   }
@@ -66,7 +66,7 @@ export default function AdminLoginPage() {
         <h2 style={{ fontFamily: "'Fraunces',serif", fontSize: "1.8rem", fontWeight: 700, marginBottom: 6 }}>Welcome back</h2>
         <p style={{ fontSize: ".88rem", color: "var(--text-muted)", marginBottom: 32 }}>Sign in to manage your volunteer programs</p>
         
-        {error && <div style={{ background: "#fde8e8", border: "1px solid #f5c6c6", borderRadius: 10, padding: "10px 14px", fontSize: ".82rem", color: "#c0392b", fontWeight: 600, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>⚠ Invalid credentials. Please try again.</div>}
+        {error && <div style={{ background: "#fde8e8", border: "1px solid #f5c6c6", borderRadius: 10, padding: "10px 14px", fontSize: ".82rem", color: "#c0392b", fontWeight: 600, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>⚠ {error}</div>}
         
         <div className="form-field">
           <label>Email Address</label>

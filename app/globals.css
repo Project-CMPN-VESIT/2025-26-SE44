@@ -502,3 +502,28 @@ tbody tr:hover td {
   font-style: italic;
   color: var(--accent);
 }
+
+@media print {
+  .sidebar, .topbar, .btn, .content > div:first-child {
+    display: none !important;
+  }
+  .main-wrap {
+    margin-left: 0 !important;
+  }
+  .content {
+    padding: 0 !important;
+  }
+  .panel {
+    border: none !important;
+    box-shadow: none !important;
+    margin-bottom: 40px !important;
+    page-break-inside: avoid;
+  }
+  .panel-header {
+    border-bottom: 2px solid #000 !important;
+    padding-left: 0 !important;
+  }
+  body {
+    background: #fff !important;
+  }
+}

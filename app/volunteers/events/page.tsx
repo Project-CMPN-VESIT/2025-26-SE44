@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Topbar from '@/components/Topbar'
 import { ICONS } from '@/lib/constants'
+import { useModal } from '@/components/ModalProvider'
 
 export default function BrowseEvents() {
   const [events, setEvents] = useState<any[]>([])
@@ -10,6 +11,7 @@ export default function BrowseEvents() {
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'invites'>('all')
+  const { showAlert } = useModal()
 
   useEffect(() => { loadData() }, [])
 
@@ -38,12 +40,17 @@ export default function BrowseEvents() {
         body: JSON.stringify({ assignmentId, action })
       })
       if (res.ok) {
-        alert(action === 'ACCEPT' ? '🎉 You have accepted the invite!' : 'Invite declined.')
+        showAlert({ 
+          message: action === 'ACCEPT' ? '🎉 You have accepted the invite! We look forward to seeing you there.' : 'Invite declined.', 
+          type: action === 'ACCEPT' ? "success" : "info" 
+        })
         loadData()
       } else {
-        alert("Something went wrong.")
+        showAlert({ message: "Something went wrong. Please try again.", type: "danger" })
       }
-    } catch { alert("Network error") }
+    } catch { 
+      showAlert({ message: "Network error. Please check your connection.", type: "danger" }) 
+    }
   }
 
   function getMyAssignment(eventId: string) {

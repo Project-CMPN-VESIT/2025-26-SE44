@@ -2,9 +2,11 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { ICONS } from "@/lib/constants"
+import { useModal } from "@/components/ModalProvider"
 
 export default function VolunteerRegister() {
   const router = useRouter()
+  const { showAlert } = useModal()
   const [step, setStep] = useState(1)
   const [form, setForm] = useState({ firstName: "", lastName: "", age: "", gender: "", email: "", phone: "", password: "", confirmPassword: "", city: "", state: "", pincode: "", travelRadius: "", bio: "", availability: "", agree: false })
   const [skills, setSkills] = useState<Set<string>>(new Set())
@@ -73,14 +75,14 @@ export default function VolunteerRegister() {
       const data = await res.json()
 
       if (!res.ok) {
-        alert("Error registering volunteer: " + (data.error || "Email might already exist."))
+        showAlert({ message: data.error || "Email might already exist.", type: "danger", title: "Registration Error" })
         setLoading(false)
         return
       }
 
       setDone(true)
     } catch (err: any) {
-      alert("Error: " + err.message)
+      showAlert({ message: err.message, type: "danger", title: "Error" })
     }
     setLoading(false)
   }

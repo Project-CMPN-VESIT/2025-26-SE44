@@ -3,6 +3,7 @@ import { useState, useEffect } from "react"
 import Sidebar from "@/components/Sidebar"
 import Topbar from "@/components/Topbar"
 import { ICONS, avatarColors } from "@/lib/constants"
+import { useModal } from "@/components/ModalProvider"
 
 type Volunteer = {
   id: string
@@ -15,11 +16,13 @@ type Volunteer = {
   joined: string
   hours: number
   events: number
+  approvalStatus: string
   hasActiveAssignment: boolean
   idx?: number
 }
 
 export default function VolunteerManagement() {
+  const { showAlert, showConfirm } = useModal()
   const [volunteers, setVolunteers] = useState<Volunteer[]>([])
   const [dbEvents, setDbEvents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -54,12 +57,12 @@ export default function VolunteerManagement() {
     
     if (finalData) {
       const mapped = finalData
-        .filter((v: any) => v.approvalStatus === 'APPROVED')
         .map((v: any) => ({
           id: v.id,
           name: v.name,
           email: v.user.email,
           status: v.isActive ? 'Active' : 'Inactive',
+          approvalStatus: v.approvalStatus,
           isAvailable: v.isActive,
           skills: v.volunteerSkills ? v.volunteerSkills.map((s: any) => s.skill.name) : [],
           area: v.area?.name || 'N/A',
@@ -74,14 +77,63 @@ export default function VolunteerManagement() {
     setLoading(false)
   }
 
+  function exportCSV() {
+    if (volunteers.length === 0) return
+    const headers = ["Name", "Email", "Location", "Status", "Approval", "Joined"]
+    const rows = volunteers.map(v => [
+      v.name,
+      v.email,
+      v.area,
+      v.isAvailable ? 'Available' : 'Busy',
+      v.approvalStatus,
+      v.joined
+    ])
+    
+    let csvContent = "data:text/csv;charset=utf-8," 
+      + headers.join(",") + "\n"
+      + rows.map(r => r.join(",")).join("\n")
+
+    const encodedUri = encodeURI(csvContent)
+    const link = document.createElement("a")
+    link.setAttribute("href", encodedUri)
+    link.setAttribute("download", "SevaConnect_Volunteers_Report.csv")
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   async function deleteVolunteer(id: string) {
-    if (!confirm("Are you sure you want to remove this volunteer? This action cannot be undone.")) return
+    const ok = await showConfirm({
+      message: "Are you sure you want to remove this volunteer? This action cannot be undone.",
+      type: "danger",
+      confirmText: "Remove Volunteer"
+    })
+    if (!ok) return
     setVolunteers(prev => prev.filter(v => v.id !== id))
-    alert("Volunteer removed successfully!")
+    showAlert({ message: "Volunteer removed successfully!", type: "success" })
+  }
+
+  async function approveVolunteer(id: string) {
+    try {
+      const res = await fetch('/api/volunteers', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, approvalStatus: 'APPROVED' })
+      })
+      if (res.ok) {
+        showAlert({ message: "Volunteer approved!", type: "success" })
+        loadVolunteers()
+      } else {
+        const d = await res.json()
+        showAlert({ message: d.error || "Failed to approve", type: "danger" })
+      }
+    } catch (err: any) {
+      showAlert({ message: err.message, type: "danger" })
+    }
   }
 
   async function assignToEvent() {
-    if (!selectedEvent || !modalVol) return alert("Please select an event first")
+    if (!selectedEvent || !modalVol) return showAlert({ message: "Please select an event first", type: "warning" })
     try {
       const res = await fetch('/api/assignments', {
         method: 'POST',
@@ -89,16 +141,16 @@ export default function VolunteerManagement() {
         body: JSON.stringify({ eventId: selectedEvent, volunteerProfileId: modalVol.id })
       })
       if (res.ok) {
-        alert(`Invite sent to ${modalVol.name}!`)
+        showAlert({ message: `Invite sent to ${modalVol.name}!`, type: "success" })
         setModalVol(null)
         setSelectedEvent("")
         loadVolunteers()
       } else {
         const data = await res.json()
-        alert("Error: " + (data.error || "Failed to assign"))
+        showAlert({ message: data.error || "Failed to assign", type: "danger" })
       }
     } catch (e: any) {
-      alert("Error: " + e.message)
+      showAlert({ message: e.message, type: "danger" })
     }
   }
 
@@ -109,7 +161,7 @@ export default function VolunteerManagement() {
   const filtered = volunteers.filter(v => {
     const q = search.toLowerCase()
     const matchQ = v.name.toLowerCase().includes(q) || v.email.toLowerCase().includes(q) || v.skills.some(s => s.toLowerCase().includes(q))
-    const matchS = !statusFilter || (statusFilter === 'Available' ? v.isAvailable : !v.isAvailable)
+    const matchS = !statusFilter || (statusFilter === 'Available' ? v.isAvailable : statusFilter === 'Pending' ? v.approvalStatus === 'PENDING' : !v.isAvailable)
     const matchSkill = !skillFilter || v.skills.includes(skillFilter)
     const matchLoc = !locationFilter || v.area === locationFilter
     return matchQ && matchS && matchSkill && matchLoc
@@ -128,7 +180,7 @@ export default function VolunteerManagement() {
         <Topbar title="Volunteer Management" />
         <div className="content">
           <div style={{ paddingBottom: 20, display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
-            <button className="btn btn-ghost">📥 Export</button>
+            <button className="btn btn-ghost" onClick={exportCSV}>📥 Export</button>
           </div>
           
           {/* Stats */}
@@ -157,6 +209,7 @@ export default function VolunteerManagement() {
             <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ padding: "10px 14px", border: "2px solid var(--border)", borderRadius: 10, fontFamily: "'Nunito',sans-serif", fontSize: ".85rem", outline: "none" }}>
               <option value="">All Status</option>
               <option value="Available">Available</option>
+              <option value="Pending">Pending Approval</option>
               <option value="Busy">Busy</option>
             </select>
             <div style={{ position: "relative" }}>
@@ -179,9 +232,9 @@ export default function VolunteerManagement() {
           <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", overflow: "hidden" }}>
             <div style={{ overflowX: "auto" }}>
               <table>
-                <thead><tr><th>Volunteer</th><th>Location</th><th>Status</th><th>Hours</th><th>Events</th><th>Joined</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Volunteer</th><th>Location</th><th>Availability</th><th>Approval</th><th>Joined</th><th>Actions</th></tr></thead>
                 <tbody>
-                   {loading ? <tr><td colSpan={7} style={{ textAlign: "center", padding: 30 }}>Loading volunteers...</td></tr> : filtered.length === 0 ? <tr><td colSpan={7} style={{ textAlign: "center", padding: 30 }}>No volunteers found.</td></tr> : filtered.map((v, i) => (
+                    {loading ? <tr><td colSpan={6} style={{ textAlign: "center", padding: 30 }}>Loading volunteers...</td></tr> : filtered.length === 0 ? <tr><td colSpan={6} style={{ textAlign: "center", padding: 30 }}>No volunteers found.</td></tr> : filtered.map((v, i) => (
                     <tr key={v.id}>
                       <td><div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                         <div style={{ width: 36, height: 36, borderRadius: "50%", background: avatarColors[i % 5], display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "#fff", fontSize: ".85rem" }}>{v.name[0]}</div>
@@ -189,8 +242,19 @@ export default function VolunteerManagement() {
                       </div></td>
                       <td style={{ fontSize: ".85rem", color: "var(--text-muted)" }}>{v.area}</td>
                       <td><span className={`badge ${v.isAvailable ? 'badge-green' : 'badge-amber'}`}>{v.isAvailable ? 'Available' : 'Busy'}</span></td>
-                      <td style={{ fontWeight: 700, fontSize: ".88rem" }}>{v.hours} hrs</td>
-                      <td style={{ fontSize: ".88rem" }}>{v.events}</td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span className={`badge ${v.approvalStatus === 'APPROVED' ? 'badge-green' : 'badge-amber'}`}>{v.approvalStatus}</span>
+                          {v.approvalStatus === 'PENDING' && (
+                            <button 
+                              onClick={() => approveVolunteer(v.id)}
+                              style={{ padding: "4px 8px", borderRadius: 6, background: "var(--primary)", color: "#fff", border: "none", fontSize: ".7rem", fontWeight: 700, cursor: "pointer" }}
+                            >
+                              Approve
+                            </button>
+                          )}
+                        </div>
+                      </td>
                       <td style={{ fontSize: ".8rem", color: "var(--text-muted)" }}>{v.joined}</td>
                       <td>
                         <div style={{ display: "flex", gap: 6 }}>
@@ -264,7 +328,14 @@ export default function VolunteerManagement() {
                     style={{ width: "100%", padding: "10px 14px", borderRadius: 12, border: "2px solid var(--border)", fontFamily: "'Nunito',sans-serif", fontSize: "0.85rem", fontWeight: 600, appearance: "none", outline: "none", cursor: "pointer" }}
                   >
                     <option value="">Select Event to Assign...</option>
-                    {dbEvents.map(ev => <option key={ev.id} value={ev.id}>{ev.title}</option>)}
+                    {dbEvents
+                      .filter(ev => {
+                         if (ev.status === 'COMPLETED' || ev.status === 'CANCELLED') return false;
+                         // Find if there's an assignment for THIS volunteer and THIS event
+                         const isAssigned = ev.eventAssignments?.some((a: any) => a.volunteerProfileId === modalVol.id);
+                         return !isAssigned;
+                      })
+                      .map(ev => <option key={ev.id} value={ev.id}>{ev.title}</option>)}
                   </select>
                   <div style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: "var(--text-muted)" }}>▼</div>
                 </div>

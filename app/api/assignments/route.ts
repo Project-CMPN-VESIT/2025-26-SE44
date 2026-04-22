@@ -10,10 +10,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     const { eventId, volunteerProfileId } = await request.json()
-    const assignment = await prisma.eventAssignment.upsert({
-      where: { volunteerProfileId_eventId: { volunteerProfileId, eventId } },
-      update: { status: 'ASSIGNED' },
-      create: { volunteerProfileId, eventId, status: 'ASSIGNED' }
+
+    // Check if already assigned
+    const existing = await prisma.eventAssignment.findUnique({
+      where: { volunteerProfileId_eventId: { volunteerProfileId, eventId } }
+    })
+
+    if (existing) {
+      return NextResponse.json({ error: 'Volunteer has already been invited to this event' }, { status: 400 })
+    }
+
+    const assignment = await prisma.eventAssignment.create({
+      data: { volunteerProfileId, eventId, status: 'ASSIGNED' }
     })
     return NextResponse.json(assignment, { status: 201 })
   } catch (error) {

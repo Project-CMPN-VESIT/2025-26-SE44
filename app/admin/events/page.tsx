@@ -5,6 +5,7 @@ import Topbar from '@/components/Topbar'
 import { ICONS } from '@/lib/constants'
 
 import { useRouter } from 'next/navigation'
+import { useModal } from '@/components/ModalProvider'
 
 type Event = {
   id: string
@@ -24,6 +25,7 @@ export default function EventManagement() {
   const [search, setSearch] = useState("")
   const [showModal, setShowModal] = useState(false)
   const router = useRouter()
+  const { showAlert } = useModal()
   const [editingEvent, setEditingEvent] = useState<Event | null>(null)
   const [form, setForm] = useState({ title: "", location: "", date: "", time: "", description: "", category: "Community", slots: 20, estimatedHours: 4 })
 
@@ -38,8 +40,34 @@ export default function EventManagement() {
     setLoading(false)
   }
 
+  function exportCSV() {
+    if (events.length === 0) return
+    const headers = ["Title", "Date", "Category", "Location", "Status", "Registered", "Slots"]
+    const rows = events.map(e => [
+      e.title,
+      new Date(e.date).toLocaleDateString(),
+      e.category,
+      e.location,
+      e.status,
+      e._count.eventAssignments,
+      e.slots
+    ])
+    
+    let csvContent = "data:text/csv;charset=utf-8," 
+      + headers.join(",") + "\n"
+      + rows.map(r => r.join(",")).join("\n")
+
+    const encodedUri = encodeURI(csvContent)
+    const link = document.createElement("a")
+    link.setAttribute("href", encodedUri)
+    link.setAttribute("download", "SevaConnect_Events_Report.csv")
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   async function handleSave() {
-    if (!form.title || !form.date || !form.location) return alert("Please fill required fields")
+    if (!form.title || !form.date || !form.location) return showAlert({ message: "Please fill in all required fields (Name, Date, Location)", type: "warning" })
     const eventDateTime = new Date(`${form.date}T${form.time || '00:00'}:00`).toISOString()
     
     const method = editingEvent ? 'PUT' : 'POST'
@@ -55,12 +83,15 @@ export default function EventManagement() {
       if (res.ok) {
         setShowModal(false)
         setEditingEvent(null)
+        showAlert({ message: editingEvent ? "Event updated successfully!" : "Event created successfully!", type: "success" })
         loadEvents()
       } else {
         const d = await res.json()
-        alert(d.error || "Error saving event")
+        showAlert({ message: d.error || "Error saving event", type: "danger" })
       }
-    } catch (err) { alert("Network error") }
+    } catch (err) { 
+      showAlert({ message: "Network error. Please try again.", type: "danger" }) 
+    }
   }
 
   const filtered = events.filter(e => e.title.toLowerCase().includes(search.toLowerCase()))
@@ -79,7 +110,7 @@ export default function EventManagement() {
           title="Event Management" 
           actions={
             <>
-              <button className="btn btn-ghost">📥 Export</button>
+              <button className="btn btn-ghost" onClick={exportCSV}>📥 Export</button>
               <button 
                 className="btn btn-primary" 
                 style={{ background: 'var(--admin)' }}
