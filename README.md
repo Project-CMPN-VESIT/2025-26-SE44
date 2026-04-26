@@ -80,10 +80,10 @@ seva-connect/
 
 ## Team
 
-Niharika Pawar
-Swara Kadam
-Vaishali Sahajwani
-Ananya Nair 
+Niharika Pawar,
+Swara Kadam,
+Vaishali Sahajwani,
+Ananya Nair
 
 ---
 
